@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Contact Sync (Ninja Forms → CSV för Mailchimp)
  * Description: Samlar Ninja Forms-inlämningar (även historik via backfill), normaliserar data, förhindrar dubletter och levererar CSV (en fil eller två filer Privat/Företag) automatiskt (schemalagt) eller manuellt. Fält: Email Address, First Name, Last Name, Company, Phone Number, Message, Source Form, Submitted At.
- * Version: 2.4.0
+ * Version: 2.4.2
  * Author: Jonathan
  * Text Domain: csmc
  */
@@ -53,9 +53,8 @@ class CSMC_Plugin {
       'delivery'        => 'email',       // email|link
       'dedupe_mode'     => 'email',       // email|email_phone
       'allowed_tlds'    => 'se,com,info,nu',
-      // Nytt:
       'freemail_domains'=> 'gmail.com,outlook.com,hotmail.com,live.com,icloud.com,yahoo.com,proton.me,protonmail.com,gmx.com,mail.com',
-      'split_mode'      => 'off',         // on = schemalagd export skapar 2 CSV (Privat/Företag)
+      'split_mode'      => 'off',         // on = alla exportfunktioner skapar 2 CSV (Privat/Företag)
     ];
     $merged = array_merge($defaults, $s);
     if ($merged !== $s) update_option(self::OPT_SETTINGS, $merged, false);
@@ -188,11 +187,11 @@ class CSMC_Plugin {
             </td>
           </tr>
           <tr>
-            <th scope="row"><label for="split_mode">Dela upp i Privat/Företag (schemalagd export)</label></th>
+            <th scope="row"><label for="split_mode">Dela upp i Privat/Företag</label></th>
             <td>
               <label><input type="checkbox" id="split_mode" name="split_mode" value="on" <?php checked(($s['split_mode'] ?? 'off'),'on'); ?> />
-              Aktivera split-läge för schemakörning</label>
-              <p class="description">När detta är ikryssat skapar schemakörningen två filer (Privat & Företag). Manuella knappar finns oavsett.</p>
+              Aktivera split-läge</label>
+              <p class="description">När detta är ikryssat skapar <strong>alla exportfunktioner</strong> två filer (Privat & Företag). Privat = freemail-domäner (gmail, outlook etc), Företag = övriga domäner.</p>
             </td>
           </tr>
         </table>
@@ -210,8 +209,8 @@ class CSMC_Plugin {
         </tbody>
       </table>
       <p class="description">
-        <strong>Obs:</strong> “Generera CSV”/“Skicka nu” använder endast <em>oexporterade</em> poster.
-        Använd “Exportera ALLA (ignorera exported)” för en full historikfil.
+        <strong>Obs:</strong> "Generera CSV"/"Skicka CSV nu" använder endast <em>oexporterade</em> poster.
+        Använd "Exportera ALLA" för att exportera hela historiken (ignorerar exported-markering).
       </p>
 
       <h2>Åtgärder</h2>
@@ -303,7 +302,7 @@ class CSMC_Plugin {
       </div>
 
       <p class="description">
-        <strong>Städning:</strong> export <em>markerade</em> inbox-poster rensas efter <?php echo intval(self::INBOX_CLEANUP_DAYS); ?> dagar.
+        <strong>Städning:</strong> <em>Exporterade</em> inbox-poster rensas efter <?php echo intval(self::INBOX_CLEANUP_DAYS); ?> dagar.
         CSV-filer rensas efter <?php echo intval(self::CSV_CLEANUP_DAYS); ?> dagar.
       </p>
     </div>
