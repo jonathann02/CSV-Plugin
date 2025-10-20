@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Contact Sync (Ninja Forms → CSV för Mailchimp)
  * Description: Samlar Ninja Forms-inlämningar (även historik via backfill), normaliserar data, förhindrar dubletter och levererar CSV (en fil eller två filer Privat/Företag) automatiskt (schemalagt) eller manuellt. Fält: Email Address, First Name, Last Name, Company, Phone Number, Message, Source Form, Submitted At.
- * Version: 2.3.0
+ * Version: 2.4.0
  * Author: Jonathan
  * Text Domain: csmc
  */
@@ -215,55 +215,55 @@ class CSMC_Plugin {
       </p>
 
       <h2>Åtgärder</h2>
+      <p class="description" style="margin-bottom:15px;">
+        <strong>Tips:</strong> Använd inställningen "Dela upp i Privat/Företag" ovan för att styra om 1 eller 2 CSV-filer skapas.
+        Alla knappar respekterar denna inställning.
+      </p>
+
+      <h3 style="margin-top:20px;">Nya kontakter (endast oexporterade)</h3>
       <p>
-        <!-- Generera 1 CSV (oexporterade) -->
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
           <?php wp_nonce_field('csmc_generate_now', 'csmc_nonce'); ?>
           <input type="hidden" name="action" value="csmc_generate_now"/>
-          <button class="button">Generera CSV och visa länk (ingen e-post)</button>
+          <button class="button">Generera CSV</button>
         </form>
 
-        <!-- Skicka 1 CSV (oexporterade) -->
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
           <?php wp_nonce_field('csmc_send_now', 'csmc_nonce'); ?>
           <input type="hidden" name="action" value="csmc_send_now"/>
           <button class="button button-primary">Skicka CSV nu (e-post)</button>
         </form>
+      </p>
 
-        <!-- Generera 2 CSV (split, oexporterade) -->
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
-          <?php wp_nonce_field('csmc_generate_split', 'csmc_nonce'); ?>
-          <input type="hidden" name="action" value="csmc_generate_split"/>
-          <button class="button">Generera 2 CSV (Privat/Företag)</button>
-        </form>
-
-        <!-- Skicka 2 CSV (split, oexporterade) -->
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
-          <?php wp_nonce_field('csmc_send_split_now', 'csmc_nonce'); ?>
-          <input type="hidden" name="action" value="csmc_send_split_now"/>
-          <button class="button button-primary">Skicka 2 CSV nu (e-post)</button>
-        </form>
-
-        <!-- Export ALL (ignorera exported) -->
+      <h3 style="margin-top:20px;">ALL historik (ignorera exported-markering)</h3>
+      <p>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
           <?php wp_nonce_field('csmc_export_all', 'csmc_nonce'); ?>
           <input type="hidden" name="action" value="csmc_export_all"/>
-          <button class="button button-secondary">Exportera ALLA (ignorera exported)</button>
+          <button class="button button-secondary">Exportera ALLA</button>
         </form>
 
-        <!-- Backfill (historik) -->
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
+          <?php wp_nonce_field('csmc_send_all', 'csmc_nonce'); ?>
+          <input type="hidden" name="action" value="csmc_send_all"/>
+          <button class="button button-primary">Skicka ALLA nu (e-post)</button>
+        </form>
+      </p>
+
+      <h3 style="margin-top:20px;">Verktyg</h3>
+      <p>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
           <?php wp_nonce_field('csmc_backfill', 'csmc_nonce'); ?>
           <input type="hidden" name="action" value="csmc_backfill"/>
           <button class="button" onclick="return confirm('Importera alla sparade Ninja Forms-inlämningar till inbox?');">Importera historik (Backfill)</button>
         </form>
 
-        <!-- Städning & Reset -->
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
           <?php wp_nonce_field('csmc_cleanup', 'csmc_nonce'); ?>
           <input type="hidden" name="action" value="csmc_cleanup"/>
-          <button class="button" onclick="return confirm('Städa gamla poster och CSV-filer?');">Kör städning nu</button>
+          <button class="button" onclick="return confirm('Städa gamla poster och CSV-filer?');">Kör städning</button>
         </form>
+
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:10px;">
           <?php wp_nonce_field('csmc_reset_ledger', 'csmc_nonce'); ?>
           <input type="hidden" name="action" value="csmc_reset_ledger"/>
@@ -361,42 +361,34 @@ class CSMC_Plugin {
       exit;
     }
 
-    // Generera en CSV (oexporterade)
+    // Generera CSV (oexporterade) - respekterar split_mode
     if (isset($_POST['action']) && $_POST['action'] === 'csmc_generate_now') {
       check_admin_referer('csmc_generate_now', 'csmc_nonce');
-      $r = $this->generate_single(false);
+      $r = $this->export_new(false);
       wp_redirect(admin_url('admin.php?page=csmc_settings&digest='.$r));
       exit;
     }
 
-    // Skicka en CSV nu (oexporterade)
+    // Skicka CSV nu (oexporterade) - respekterar split_mode
     if (isset($_POST['action']) && $_POST['action'] === 'csmc_send_now') {
       check_admin_referer('csmc_send_now', 'csmc_nonce');
-      $r = $this->generate_single(true);
+      $r = $this->export_new(true);
       wp_redirect(admin_url('admin.php?page=csmc_settings&digest='.$r));
       exit;
     }
 
-    // Generera två CSV (Privat/Företag, oexporterade)
-    if (isset($_POST['action']) && $_POST['action'] === 'csmc_generate_split') {
-      check_admin_referer('csmc_generate_split', 'csmc_nonce');
-      $r = $this->generate_split(false);
-      wp_redirect(admin_url('admin.php?page=csmc_settings&digest='.$r));
-      exit;
-    }
-
-    // Skicka två CSV nu (Privat/Företag, oexporterade)
-    if (isset($_POST['action']) && $_POST['action'] === 'csmc_send_split_now') {
-      check_admin_referer('csmc_send_split_now', 'csmc_nonce');
-      $r = $this->generate_split(true);
-      wp_redirect(admin_url('admin.php?page=csmc_settings&digest='.$r));
-      exit;
-    }
-
-    // Exportera ALLT (ignorera exported)
+    // Exportera ALLA (ignorera exported) - respekterar split_mode
     if (isset($_POST['action']) && $_POST['action'] === 'csmc_export_all') {
       check_admin_referer('csmc_export_all', 'csmc_nonce');
-      $r = $this->export_all_single();
+      $r = $this->export_all(false);
+      wp_redirect(admin_url('admin.php?page=csmc_settings&digest='.$r));
+      exit;
+    }
+
+    // Skicka ALLA (ignorera exported) - respekterar split_mode
+    if (isset($_POST['action']) && $_POST['action'] === 'csmc_send_all') {
+      check_admin_referer('csmc_send_all', 'csmc_nonce');
+      $r = $this->export_all(true);
       wp_redirect(admin_url('admin.php?page=csmc_settings&digest='.$r));
       exit;
     }
@@ -480,12 +472,7 @@ class CSMC_Plugin {
   public function run_digest() {
     $s = get_option(self::OPT_SETTINGS, []);
     $send = (($s['delivery'] ?? 'email') === 'email');
-
-    if (($s['split_mode'] ?? 'off') === 'on') {
-      $this->generate_split($send);
-    } else {
-      $this->generate_single($send);
-    }
+    $this->export_new($send);
   }
 
   public function run_cleanup() {
@@ -968,6 +955,85 @@ class CSMC_Plugin {
     if (!$path) return 'fail';
     $this->add_log('CSV (ALL) skapad: ' . basename($path) . ' (' . count($rows) . ' rader)');
     return 'ok';
+  }
+
+  // Export ALL Split (ignorera exported) – två CSV (Privat/Företag)
+  private function export_all_split($should_send_email) {
+    $s = get_option(self::OPT_SETTINGS, []);
+    $inbox = get_option(self::OPT_INBOX, []);
+    [$priv, $corp, $emails] = $this->build_split_rows($inbox, $s['dedupe_mode'] ?? 'email', $s['freemail_domains'] ?? '', true); // include_exported = true
+
+    if (empty($priv) && empty($corp)) { $this->add_log('Inga poster i inbox (ALL split).'); return 'empty'; }
+
+    [$p1] = $this->write_csv_file($priv, '-ALL-Private');
+    [$p2] = $this->write_csv_file($corp, '-ALL-Company');
+    $c1 = count($priv); $c2 = count($corp);
+    $this->add_log('CSV (ALL Privat/Företag) skapade: ' . ($p1?basename($p1):'–') . " ($c1) / " . ($p2?basename($p2):'–') . " ($c2)");
+
+    if ($should_send_email) {
+      $ok = $this->send_email_with_attachments(
+        $s['recipient_email'] ?? get_bloginfo('admin_email'),
+        ($s['email_subject'] ?? 'Kontakter (CSV)') . ' – ALLA Privat/Företag',
+        array_filter([$p1,$p2]),
+        "Privat: $c1, Företag: $c2"
+      );
+      if ($ok) {
+        $this->add_log('E-post skickad med ALLA kontakter (2 bilagor split). Total: ' . count($emails) . ' poster.');
+        return 'ok';
+      }
+      $this->add_log('E-post misslyckades (ALL split).');
+      return 'fail';
+    } else {
+      $this->add_log('CSV (ALL split) tillgängliga i admin. Total: ' . count($emails) . ' poster.');
+      return 'ok';
+    }
+  }
+
+  /* ----------------------- Smart routing (respekterar split_mode) ----------------------- */
+
+  // Export NYA kontakter (oexporterade) - automatiskt 1 eller 2 CSV baserat på split_mode
+  private function export_new($should_send_email) {
+    $s = get_option(self::OPT_SETTINGS, []);
+    if (($s['split_mode'] ?? 'off') === 'on') {
+      return $this->generate_split($should_send_email);
+    } else {
+      return $this->generate_single($should_send_email);
+    }
+  }
+
+  // Export ALLA kontakter (ignorera exported) - automatiskt 1 eller 2 CSV baserat på split_mode
+  private function export_all($should_send_email) {
+    $s = get_option(self::OPT_SETTINGS, []);
+    if (($s['split_mode'] ?? 'off') === 'on') {
+      return $this->export_all_split($should_send_email);
+    } else {
+      if ($should_send_email) {
+        // För "Skicka ALLA" behöver vi skicka mejl, så vi kör export_all_split med mejl
+        // Men om split är av, kör vi single med mejl-stöd
+        $inbox = get_option(self::OPT_INBOX, []);
+        [$rows] = $this->build_rows($inbox, $s['dedupe_mode'] ?? 'email', true);
+        if (empty($rows)) { $this->add_log('Inga poster i inbox (ALL).'); return 'empty'; }
+        [$path] = $this->write_csv_file($rows, '-ALL');
+        if (!$path) return 'fail';
+        $count = count($rows);
+        $this->add_log('CSV (ALL) skapad: ' . basename($path) . ' (' . $count . ' rader)');
+        
+        $ok = $this->send_email_with_attachment(
+          $s['recipient_email'] ?? get_bloginfo('admin_email'),
+          ($s['email_subject'] ?? 'Kontakter (CSV)') . ' – ALLA',
+          $path,
+          $count
+        );
+        if ($ok) {
+          $this->add_log('E-post skickad med ALLA kontakter.');
+          return 'ok';
+        }
+        $this->add_log('E-post misslyckades (ALL).');
+        return 'fail';
+      } else {
+        return $this->export_all_single();
+      }
+    }
   }
 
   /* ----------------------- Utils ----------------------- */
